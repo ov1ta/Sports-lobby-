@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="theme-color" id="meta-theme" content="#7c6eff"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Priv Lobby"/>
+<meta name="description" content="ND2 Statistics — Private Lobby Timetable Checker"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
+<title>Private Lobby — Timetable</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet"/>
+<style>
+/* ===========================
+   CSS VARIABLES / THEMES
+=========================== */
+:root {
+  --bg: #0a0a0f;
+  --surface: #13131a;
+  --card: #1a1a24;
+  --border: #2a2a38;
+  --accent: #7c6eff;
+  --accent2: #ff6e9c;
+  --accent3: #6effd0;
+  --text: #e8e8f0;
+  --muted: #6b6b85;
+  --live: #6effd0;
+  --break-col: #ff9d6e;
+  --radius: 16px;
+  --font-display: 'Outfit', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+[data-theme="ocean"] {
+  --bg: #060d1a; --surface: #0d1829; --card: #112033;
+  --border: #1a3050; --accent: #00b4d8; --accent2: #f72585;
+  --accent3: #90e0ef; --text: #caf0f8; --muted: #4a7fa5;
+}
+[data-theme="forest"] {
+  --bg: #080f08; --surface: #101a10; --card: #162116;
+  --border: #223322; --accent: #52b788; --accent2: #f4a261;
+  --accent3: #95d5b2; --text: #d8f3dc; --muted: #4a7a58;
+}
+[data-theme="ember"] {
+  --bg: #0f0a08; --surface: #1a120d; --card: #221810;
+  --border: #3a2518; --accent: #ff6b35; --accent2: #ffd166;
+  --accent3: #ff9a3c; --text: #ffe8d6; --muted: #7a5545;
+}
+[data-theme="mono"] {
+  --bg: #0a0a0a; --surface: #111111; --card: #1a1a1a;
+  --border: #2a2a2a; --accent: #e0e0e0; --accent2: #aaaaaa;
+  --accent3: #ffffff; --text: #f0f0f0; --muted: #555555;
+}
+[data-theme="candy"] {
+  --bg: #0d0818; --surface: #150d2a; --card: #1e1238;
+  --border: #2e1a50; --accent: #ff61d8; --accent2: #61ffb4;
+  --accent3: #ffd166; --text: #f0e6ff; --muted: #7a5590;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font-display);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  padding-top: env(safe-area-inset-top);
+}
+
+body::before {
+  content:'';
+  position:fixed; inset:0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  pointer-events:none; z-index:0; opacity:.5;
+}
+
+.container {
+  position:relative; z-index:1;
+  max-width:860px; margin:0 auto;
+  padding: 16px 14px 100px;
+}
+
+/* ===========================
+   GREETING OVERLAY
+=========================== */
+.greeting-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg);
+  opacity: 1;
+  transition: opacity 0.5s ease;
+  pointer-events: none;
+}
+.greeting-overlay.fade-out { opacity: 0; }
+.greeting-overlay.gone { display: none; }
+
+.greeting-inner { text-align: center; }
+.greeting-emoji { font-size: 56px; display: block; margin-bottom: 12px; animation: bounce 0.6s ease; }
+.greeting-text {
+  font-family: var(--font-display);
+  font-size: clamp(28px, 7vw, 48px);
+  font-weight: 900;
+  color: var(--text);
+  line-height: 1.1;
+}
+.greeting-sub { font-size: 14px; color: var(--muted); margin-top: 6px; }
+
+/* ===========================
+   OFFLINE TOAST
+=========================== */
+.offline-bar {
+  position: fixed; top: calc(env(safe-area-inset-top) + 8px);
+  left: 50%; transform: translateX(-50%) translateY(-80px);
+  background: #2a1a00; border: 1px solid #ff9d6e;
+  border-radius: 100px; padding: 8px 20px;
+  font-size: 12px; font-weight: 600; color: #ff9d6e;
+  z-index: 9998; white-space: nowrap;
+  transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  display: flex; align-items: center; gap: 6px;
+}
+.offline-bar.show { transform: translateX(-50%) translateY(0); }
+
+/* ===========================
+   INSTALL BANNER
+=========================== */
+.install-banner {
+  display: none;
+  align-items: center; gap: 10px;
+  background: linear-gradient(135deg, rgba(124,110,255,.15), rgba(110,255,208,.08));
+  border: 1px solid rgba(124,110,255,.35);
+  border-radius: var(--radius); padding: 12px 14px;
+  margin-bottom: 12px; animation: slideUp .5s ease;
+}
+.install-banner.show { display: flex; }
+.ib-text { flex:1; font-size: 12px; color: var(--text); line-height: 1.4; }
+.ib-text strong { color: var(--accent); font-weight: 700; display: block; font-size: 13px; }
+.ib-btn {
+  background: var(--accent); color: #fff; border: none;
+  border-radius: 10px; padding: 8px 14px;
+  font-family: var(--font-display); font-size: 12px; font-weight: 700;
+  cursor: pointer; white-space: nowrap; flex-shrink: 0;
+}
+.ib-close {
+  background: none; border: none; color: var(--muted);
+  font-size: 16px; cursor: pointer; padding: 4px; flex-shrink: 0;
+}
+
+/* ===========================
+   HEADER
+=========================== */
+.header {
+  display: flex; align-items: flex-start;
+  justify-content: space-between; gap: 10px;
+  margin-bottom: 16px; animation: fadeDown .5s ease;
+}
+.header-left { flex: 1; min-width: 0; }
+
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(124,110,255,.1); border: 1px solid rgba(124,110,255,.25);
+  border-radius: 100px; padding: 3px 10px;
+  font-size: 10px; color: var(--accent);
+  letter-spacing: .07em; text-transform: uppercase; margin-bottom: 6px;
+}
+.badge .dot {
+  width:5px; height:5px; background:var(--accent);
+  border-radius:50%; animation: pulse 1.5s infinite;
+}
+
+h1 {
+  font-family: var(--font-display);
+  font-size: clamp(24px, 6vw, 38px);
+  font-weight: 900; line-height: 1.05; letter-spacing: -.02em;
+}
+h1 span { color: var(--accent); }
+.subtitle { font-size: 10px; color: var(--muted); margin-top: 3px; letter-spacing: .05em; }
+
+.header-right { display: flex; flex-direction: column; gap: 7px; align-items: flex-end; flex-shrink: 0; }
+
+.clock-box {
+  text-align: right; background: var(--card);
+  border: 1px solid var(--border); border-radius: 12px; padding: 9px 13px;
+}
+#clock {
+  font-family: var(--font-mono);
+  font-size: 18px; font-weight: 700; color: var(--accent3);
+}
+#date-display { font-size: 10px; color: var(--muted); margin-top: 1px; }
+
+.header-btns { display: flex; gap: 6px; }
+
+.icon-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 10px; cursor: pointer;
+  font-size: 15px; color: var(--muted);
+  transition: all .2s;
+}
+.icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ===========================
+   NOW CARD
+=========================== */
+.now-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 20px; padding: 18px;
+  margin-bottom: 10px; position: relative; overflow: hidden;
+  animation: fadeUp .5s ease .05s both;
+}
+.now-card::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:2px;
+  background: linear-gradient(90deg, var(--accent), var(--accent2), var(--accent3));
+}
+.section-label {
+  font-size: 10px; color: var(--muted);
+  letter-spacing: .1em; text-transform: uppercase; margin-bottom: 8px;
+  display: flex; align-items: center; gap: 6px;
+}
+.now-course {
+  font-family: var(--font-display);
+  font-size: clamp(16px, 4.5vw, 24px); font-weight: 800; line-height: 1.2;
+}
+.now-course.break-text { color: var(--break-col); }
+.now-course.free-text  { color: var(--muted); font-weight: 600; }
+.now-course.live-text  { color: var(--live); }
+
+.now-meta { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+
+.tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 9px; border-radius: 8px;
+  font-size: 11px; font-weight: 600;
+}
+.tag.live-tag { background:rgba(110,255,208,.12); color:var(--live); border:1px solid rgba(110,255,208,.25); animation:pulse 2s infinite; }
+.tag.room     { background:rgba(110,255,208,.08); color:var(--accent3); border:1px solid rgba(110,255,208,.15); }
+.tag.lec      { background:rgba(255,110,156,.08); color:var(--accent2); border:1px solid rgba(255,110,156,.15); }
+.tag.time     { background:rgba(124,110,255,.1);  color:var(--accent);  border:1px solid rgba(124,110,255,.2); }
+
+.progress-wrap { margin-top: 14px; }
+.progress-label { display:flex; justify-content:space-between; font-size:10px; color:var(--muted); margin-bottom:5px; }
+.progress-bar { height:4px; background:var(--border); border-radius:100px; overflow:hidden; }
+.progress-fill { height:100%; background:linear-gradient(90deg, var(--accent), var(--accent3)); border-radius:100px; transition:width 1s linear; }
+
+/* ===========================
+   COUNTDOWN
+=========================== */
+.countdown-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 20px; padding: 16px 18px;
+  margin-bottom: 10px; animation: fadeUp .5s ease .1s both;
+}
+.countdown-row { display:flex; align-items:baseline; gap:8px; margin-top:4px; }
+.countdown-next { font-family:var(--font-display); font-size:13px; font-weight:700; color:var(--accent); flex:1; line-height:1.3; }
+.countdown-timer { font-family:var(--font-mono); font-size:clamp(22px,5vw,30px); font-weight:700; color:var(--text); }
+.countdown-timer.urgent { color:var(--accent2); animation:flash .8s infinite; }
+
+/* ===========================
+   ALERTS ROW
+=========================== */
+.alerts-row {
+  display:flex; align-items:center; gap:10px;
+  background:var(--card); border:1px solid var(--border);
+  border-radius:14px; padding:12px 14px;
+  margin-bottom:10px; animation:fadeUp .5s ease .15s both;
+}
+.alerts-icon { font-size:18px; flex-shrink:0; }
+.alerts-text { flex:1; }
+.a-title { font-size:13px; font-weight:700; color:var(--text); }
+.a-sub { font-size:10px; color:var(--muted); margin-top:2px; }
+.switch { position:relative; width:44px; height:24px; flex-shrink:0; }
+.switch input { display:none; }
+.switch-track { position:absolute; inset:0; background:var(--border); border-radius:100px; cursor:pointer; transition:background .3s; }
+.switch input:checked + .switch-track { background:var(--accent); }
+.switch-thumb { position:absolute; top:3px; left:3px; width:18px; height:18px; background:#fff; border-radius:50%; pointer-events:none; transition:transform .3s; }
+.switch input:checked ~ .switch-thumb { transform:translateX(20px); }
+
+/* ===========================
+   DAY TABS
+=========================== */
+.day-tabs {
+  display:flex; gap:6px; overflow-x:auto; padding-bottom:2px;
+  margin-bottom:10px; scrollbar-width:none;
+  animation:fadeUp .5s ease .2s both;
+}
+.day-tabs::-webkit-scrollbar { display:none; }
+.day-tab {
+  flex-shrink:0; padding:7px 14px; border-radius:10px;
+  font-family:var(--font-display); font-size:12px; font-weight:700;
+  cursor:pointer; border:1px solid var(--border);
+  background:var(--card); color:var(--muted); transition:all .2s;
+}
+.day-tab:hover  { border-color:var(--accent); color:var(--accent); }
+.day-tab.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+.day-tab.today  { border-color:rgba(124,110,255,.4); color:var(--accent); }
+
+/* ===========================
+   SCHEDULE
+=========================== */
+.schedule-wrap { animation:fadeUp .5s ease .25s both; }
+.schedule-header {
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:8px; padding: 0 2px;
+}
+.schedule-title { font-size:11px; font-weight:700; color:var(--muted); letter-spacing:.1em; text-transform:uppercase; }
+.edit-all-btn {
+  display:flex; align-items:center; gap:4px;
+  background:none; border:1px solid var(--border);
+  border-radius:8px; padding:4px 10px;
+  font-family:var(--font-display); font-size:10px; font-weight:600;
+  color:var(--muted); cursor:pointer; transition:all .2s;
+}
+.edit-all-btn:hover { border-color:var(--accent); color:var(--accent); }
+
+.slot {
+  display:flex; align-items:stretch; gap:10px;
+  margin-bottom:7px; border-radius:14px; padding:13px 14px;
+  background:var(--card); border:1px solid var(--border);
+  transition:all .2s; position:relative; overflow:hidden; cursor:pointer;
+}
+.slot:hover { border-color:var(--accent); transform:translateX(2px); }
+.slot.is-live  { border-color:rgba(110,255,208,.4); background:rgba(110,255,208,.03); }
+.slot.is-live::before  { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--live); border-radius:0 3px 3px 0; }
+.slot.is-break { border-color:rgba(255,157,110,.3); background:rgba(255,157,110,.03); }
+.slot.is-break::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--break-col); border-radius:0 3px 3px 0; }
+.slot.is-past  { opacity:.38; }
+
+.slot-time { display:flex; flex-direction:column; justify-content:center; font-size:10px; color:var(--muted); min-width:50px; line-height:1.7; }
+.slot-time .start { font-weight:700; color:var(--text); font-size:11px; font-family:var(--font-mono); }
+.slot-divider { width:1px; background:var(--border); align-self:stretch; flex-shrink:0; }
+.slot-info { flex:1; min-width:0; }
+.slot-course { font-family:var(--font-display); font-size:13px; font-weight:700; color:var(--text); line-height:1.3; }
+.slot.is-live  .slot-course { color:var(--live); }
+.slot.is-break .slot-course { color:var(--break-col); }
+.slot-details { display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; }
+.sbadge { font-size:10px; padding:2px 7px; border-radius:6px; font-weight:600; }
+.sb-room { background:rgba(110,255,208,.08); color:var(--accent3); }
+.sb-lec  { background:rgba(255,110,156,.08); color:var(--accent2); }
+.sb-live { background:rgba(110,255,208,.12); color:var(--live); animation:pulse 2s infinite; }
+.sb-next { background:rgba(124,110,255,.12); color:var(--accent); }
+
+.free-day-msg { text-align:center; padding:36px 20px; color:var(--muted); font-size:16px; font-weight:600; }
+
+/* ===========================
+   FOOTER
+=========================== */
+.footer {
+  text-align:center; padding:16px 0 4px;
+  font-size:11px; color:var(--muted); letter-spacing:.06em;
+  border-top:1px solid var(--border); margin-top:20px;
+}
+.footer span { color:var(--accent); font-weight:700; }
+
+/* ===========================
+   MODAL BASE
+=========================== */
+.modal-overlay {
+  display:none; position:fixed; inset:0; z-index:2000;
+  background:rgba(0,0,0,.7); backdrop-filter:blur(6px);
+  align-items:flex-end; justify-content:center;
+  padding:0;
+}
+.modal-overlay.open { display:flex; animation:fadeIn .2s ease; }
+
+.modal {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:20px 20px 0 0; padding:20px;
+  width:100%; max-width:500px;
+  max-height: 90vh; overflow-y: auto;
+  animation:slideUp .3s cubic-bezier(0.34,1.56,0.64,1);
+}
+.modal-handle { width:36px; height:4px; background:var(--border); border-radius:100px; margin:0 auto 16px; }
+.modal-title { font-family:var(--font-display); font-size:18px; font-weight:800; margin-bottom:16px; }
+
+/* FORM ELEMENTS */
+.form-group { margin-bottom:14px; }
+.form-label { font-size:11px; color:var(--muted); letter-spacing:.06em; text-transform:uppercase; margin-bottom:5px; display:block; font-weight:600; }
+.form-input {
+  width:100%; background:var(--surface); border:1px solid var(--border);
+  border-radius:10px; padding:10px 12px;
+  font-family:var(--font-display); font-size:13px; font-weight:500; color:var(--text);
+  outline:none; transition:border-color .2s;
+}
+.form-input:focus { border-color:var(--accent); }
+
+.form-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+
+.modal-btns { display:flex; gap:8px; margin-top:18px; }
+.btn-primary {
+  flex:1; background:var(--accent); color:#fff; border:none;
+  border-radius:10px; padding:12px; font-family:var(--font-display);
+  font-size:13px; font-weight:700; cursor:pointer; transition:opacity .2s;
+}
+.btn-primary:hover { opacity:.85; }
+.btn-secondary {
+  flex:1; background:var(--surface); color:var(--muted); border:1px solid var(--border);
+  border-radius:10px; padding:12px; font-family:var(--font-display);
+  font-size:13px; font-weight:700; cursor:pointer; transition:all .2s;
+}
+.btn-secondary:hover { border-color:var(--accent2); color:var(--accent2); }
+.btn-danger {
+  background:rgba(255,110,156,.1); color:var(--accent2); border:1px solid rgba(255,110,156,.2);
+  border-radius:10px; padding:12px 16px; font-family:var(--font-display);
+  font-size:13px; font-weight:700; cursor:pointer; transition:all .2s;
+}
+.btn-danger:hover { background:rgba(255,110,156,.2); }
+
+/* ===========================
+   SETTINGS MODAL
+=========================== */
+.settings-section { margin-bottom:20px; }
+.settings-section-title { font-size:11px; color:var(--muted); letter-spacing:.08em; text-transform:uppercase; margin-bottom:10px; font-weight:700; }
+
+.theme-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; }
+.theme-swatch {
+  aspect-ratio:1; border-radius:12px; cursor:pointer;
+  border:2px solid transparent; transition:all .2s;
+  position:relative; overflow:hidden;
+}
+.theme-swatch.active { border-color:var(--accent); }
+.theme-swatch::after { content:''; position:absolute; inset:0; }
+
+.setting-row {
+  display:flex; align-items:center; gap:10px;
+  padding:12px; background:var(--surface);
+  border:1px solid var(--border); border-radius:12px; margin-bottom:8px;
+}
+.sr-info { flex:1; }
+.sr-title { font-size:13px; font-weight:600; color:var(--text); }
+.sr-sub   { font-size:11px; color:var(--muted); margin-top:1px; }
+
+.year-input {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:8px; padding:6px 10px;
+  font-family:var(--font-display); font-size:12px; font-weight:600; color:var(--text);
+  outline:none; width:130px; text-align:center;
+}
+
+/* ===========================
+   TOAST
+=========================== */
+.toast {
+  position:fixed; bottom:28px; left:50%;
+  transform:translateX(-50%) translateY(80px);
+  background:var(--card); border:1px solid var(--accent);
+  border-radius:12px; padding:10px 18px;
+  font-family:var(--font-display); font-size:13px; font-weight:600; color:var(--text);
+  z-index:3000; white-space:nowrap;
+  box-shadow:0 8px 32px rgba(0,0,0,.5);
+  transition:transform .4s cubic-bezier(0.34,1.56,0.64,1);
+}
+.toast.show { transform:translateX(-50%) translateY(0); }
+
+/* ===========================
+   NOTIFICATION POPUP
+=========================== */
+.notif-popup {
+  position:fixed; top:calc(env(safe-area-inset-top) + 12px); right:12px;
+  max-width:280px; background:var(--card); border:1px solid var(--accent);
+  border-radius:14px; padding:13px 15px; z-index:2500;
+  box-shadow:0 8px 32px rgba(0,0,0,.5); display:none;
+  animation:slideInRight .4s ease;
+}
+.notif-popup.show { display:block; }
+.np-title { font-size:13px; font-weight:700; color:var(--accent); margin-bottom:3px; }
+.np-body  { font-size:11px; color:var(--muted); }
+
+/* ===========================
+   ANIMATIONS
+=========================== */
+@keyframes fadeDown  { from{opacity:0;transform:translateY(-10px)} to{opacity:1;transform:none} }
+@keyframes fadeUp    { from{opacity:0;transform:translateY(12px)}  to{opacity:1;transform:none} }
+@keyframes slideUp   { from{opacity:0;transform:translateY(40px)}  to{opacity:1;transform:none} }
+@keyframes fadeIn    { from{opacity:0} to{opacity:1} }
+@keyframes slideInRight { from{opacity:0;transform:translateX(20px)} to{opacity:1;transform:none} }
+@keyframes pulse     { 0%,100%{opacity:1} 50%{opacity:.45} }
+@keyframes flash     { 0%,100%{opacity:1} 50%{opacity:.35} }
+@keyframes bounce    { 0%{transform:scale(.5)} 60%{transform:scale(1.1)} 100%{transform:scale(1)} }
+</style>
+</head>
+<body>
+
+<!-- GREETING OVERLAY -->
+<div class="greeting-overlay" id="greeting-overlay">
+  <div class="greeting-inner">
+    <span class="greeting-emoji" id="greeting-emoji">☀️</span>
+    <div class="greeting-text" id="greeting-text">Good Morning</div>
+    <div class="greeting-sub" id="greeting-sub">Let's see what's on today</div>
+  </div>
+</div>
+
+<!-- OFFLINE BAR -->
+<div class="offline-bar" id="offline-bar">📵 You're offline — showing cached data</div>
+
+<!-- INSTALL BANNER -->
+<div class="install-banner" id="install-banner">
+  <div class="ib-text">
+    <strong>📱 Add to Home Screen</strong>
+    Install for background alerts & offline access!
+  </div>
+  <button class="ib-btn" id="install-btn">Install</button>
+  <button class="ib-close" id="install-close">✕</button>
+</div>
+
+<div class="container">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-left">
+      <div class="badge"><span class="dot"></span> ND 2 · Statistics</div>
+      <h1>Private<br/><span>Lobby</span></h1>
+      <div class="subtitle" id="app-subtitle">DEPT. OF STATISTICS — 2024/2025 FIRST SEM</div>
+    </div>
+    <div class="header-right">
+      <div class="clock-box">
+        <div id="clock">--:--:--</div>
+        <div id="date-display">---</div>
+      </div>
+      <div class="header-btns">
+        <div class="icon-btn" id="share-btn" title="Share">🔗</div>
+        <div class="icon-btn" id="settings-btn" title="Settings">⚙️</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NOW CARD -->
+  <div class="now-card">
+    <div class="section-label">▶ Right now</div>
+    <div class="now-course" id="now-course">Loading…</div>
+    <div class="now-meta" id="now-meta"></div>
+    <div class="progress-wrap" id="progress-wrap" style="display:none">
+      <div class="progress-label">
+        <span id="prog-start">--</span>
+        <span id="prog-pct">--%</span>
+        <span id="prog-end">--</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
+    </div>
+  </div>
+
+  <!-- COUNTDOWN -->
+  <div class="countdown-card">
+    <div class="section-label">⏱ Next up</div>
+    <div class="countdown-row">
+      <div class="countdown-next" id="next-name">—</div>
+      <div class="countdown-timer" id="countdown-timer">--:--</div>
+    </div>
+  </div>
+
+  <!-- ALERTS -->
+  <div class="alerts-row">
+    <div class="alerts-icon">🔔</div>
+    <div class="alerts-text">
+      <div class="a-title">Class Alerts</div>
+      <div class="a-sub" id="alert-sub">Notify me 5 min before class starts</div>
+    </div>
+    <label class="switch">
+      <input type="checkbox" id="notif-switch"/>
+      <div class="switch-track"></div>
+      <div class="switch-thumb"></div>
+    </label>
+  </div>
+
+  <!-- DAY TABS -->
+  <div class="day-tabs" id="day-tabs"></div>
+
+  <!-- SCHEDULE -->
+  <div class="schedule-wrap">
+    <div class="schedule-header">
+      <div class="schedule-title" id="sched-title">Today's Schedule</div>
+      <button class="edit-all-btn" id="add-slot-btn">✚ Add Class</button>
+    </div>
+    <div id="schedule-list"></div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer"><span>Private Lobby</span> · ND2 Statistics · 2024/2025</div>
+
+</div><!-- /container -->
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- NOTIF POPUP -->
+<div class="notif-popup" id="notif-popup">
+  <div class="np-title" id="np-title"></div>
+  <div class="np-body"  id="np-body"></div>
+</div>
+
+<!-- ===========================
+     EDIT SLOT MODAL
+=========================== -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="edit-modal-title">Edit Class</div>
+    <input type="hidden" id="edit-day"/>
+    <input type="hidden" id="edit-idx"/>
+    <div class="form-group">
+      <label class="form-label">Course Code</label>
+      <input class="form-input" id="edit-code" placeholder="e.g. STA 213"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Course Title</label>
+      <input class="form-input" id="edit-title" placeholder="e.g. Economic & Social Statistics I"/>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Start Time</label>
+        <input class="form-input" id="edit-start" type="time"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">End Time</label>
+        <input class="form-input" id="edit-end" type="time"/>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Venue / Room</label>
+      <input class="form-input" id="edit-room" placeholder="e.g. C5 or NASB 0-8"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Lecturer</label>
+      <input class="form-input" id="edit-lec" placeholder="e.g. Mr Idris"/>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-danger" id="edit-delete">Delete</button>
+      <button class="btn-secondary" id="edit-cancel">Cancel</button>
+      <button class="btn-primary"  id="edit-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===========================
+     SETTINGS MODAL
+=========================== -->
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">⚙️ Settings</div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">Theme</div>
+      <div class="theme-grid">
+        <div class="theme-swatch" data-theme="default" style="background:linear-gradient(135deg,#7c6eff,#6effd0)" title="Default"></div>
+        <div class="theme-swatch" data-theme="ocean"   style="background:linear-gradient(135deg,#00b4d8,#f72585)" title="Ocean"></div>
+        <div class="theme-swatch" data-theme="forest"  style="background:linear-gradient(135deg,#52b788,#f4a261)" title="Forest"></div>
+        <div class="theme-swatch" data-theme="ember"   style="background:linear-gradient(135deg,#ff6b35,#ffd166)" title="Ember"></div>
+        <div class="theme-swatch" data-theme="mono"    style="background:linear-gradient(135deg,#555,#eee)" title="Mono"></div>
+        <div class="theme-swatch" data-theme="candy"   style="background:linear-gradient(135deg,#ff61d8,#61ffb4)" title="Candy"></div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">General</div>
+      <div class="setting-row">
+        <div class="sr-info">
+          <div class="sr-title">Academic Year</div>
+          <div class="sr-sub">Shown in subtitle & footer</div>
+        </div>
+        <input class="year-input" id="year-input" value="2024/2025"/>
+      </div>
+      <div class="setting-row">
+        <div class="sr-info">
+          <div class="sr-title">Reset Timetable</div>
+          <div class="sr-sub">Restore original class schedule</div>
+        </div>
+        <button class="btn-danger" id="reset-btn" style="padding:8px 12px;font-size:11px;">Reset</button>
+      </div>
+    </div>
+
+    <div class="modal-btns">
+      <button class="btn-primary" id="settings-close">Done</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// DEFAULT TIMETABLE (ND 2 — corrected from handwritten photo
+// + prospectus course names)
+// ============================================================
+const DEFAULT_TT = {
+  Monday: [
+    { start:'10:00', end:'12:00', code:'STA 213',  course:'Economic & Social Statistics I',  room:'C5',       lecturer:'Mr Obidiegwu' },
+    { start:'12:00', end:'13:00', code:'BREAK',    course:'Break',                             room:'',         lecturer:'' },
+    { start:'14:00', end:'16:00', code:'STA 213P', course:'Economic & Social Statistics I (Practical)', room:'NASB 0-8', lecturer:'Miss Tiamiyu R.' },
+  ],
+  Tuesday: [
+    { start:'08:00', end:'10:00', code:'STA 211',  course:'Statistical Theory II',            room:'C5',       lecturer:'Mr Idris' },
+    { start:'10:00', end:'12:00', code:'STA 212',  course:'Elements of Sampling Theory',      room:'C5',       lecturer:'Mr Akinsanya & Mr Adeniji' },
+    { start:'12:00', end:'13:00', code:'BREAK',    course:'Break',                             room:'',         lecturer:'' },
+    { start:'13:00', end:'15:00', code:'STA 214',  course:'Industrial Statistics I',          room:'C5',       lecturer:'Mr Ganiyu' },
+    { start:'15:00', end:'17:00', code:'GNS 201',  course:'General Studies 201',              room:'C5',       lecturer:'' },
+  ],
+  Wednesday: [
+    { start:'08:00', end:'10:00', code:'STA 214P', course:'Industrial Statistics I (Practical)', room:'NASB 0-9', lecturer:'Miss Tiamiyu R.' },
+    { start:'10:00', end:'12:00', code:'EED 216',  course:'Practice of Entrepreneurship',        room:'C5',       lecturer:'' },
+    { start:'12:00', end:'13:00', code:'BREAK',    course:'Break',                               room:'',         lecturer:'' },
+    { start:'13:00', end:'15:00', code:'MTH 212',  course:'Calculus II',                         room:'C5',       lecturer:'' },
+    { start:'15:00', end:'17:00', code:'STA 212P', course:'Elements of Sampling Theory (Practical)', room:'NASB 0-8', lecturer:'Miss Tiamiyu R.' },
+  ],
+  Thursday: [
+    { start:'08:00', end:'10:00', code:'COM 215',  course:'Computer Packages II',             room:'C5',       lecturer:'' },
+    { start:'12:00', end:'13:00', code:'BREAK',    course:'Break',                             room:'',         lecturer:'' },
+    { start:'14:00', end:'17:00', code:'STA 212P', course:'Elements of Sampling Theory (Practical)', room:'NASB 0-8', lecturer:'Miss Tiamiyu R.' },
+  ],
+  Friday: [
+    { start:'10:00', end:'12:00', code:'MTH 213',  course:'Linear Algebra',                   room:'C5',       lecturer:'' },
+    { start:'12:00', end:'13:00', code:'BREAK',    course:'Break',                             room:'',         lecturer:'' },
+  ],
+};
+
+const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+
+// ============================================================
+// STORAGE HELPERS
+// ============================================================
+function save(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch(e){} }
+function load(key, def) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : def; } catch(e){ return def; } }
+
+// ============================================================
+// STATE
+// ============================================================
+let TIMETABLE   = load('pl_timetable', DEFAULT_TT);
+let selectedDay = null;
+let notifEnabled= load('pl_notif', false);
+let alerted     = {};
+let swReg       = null;
+let deferredPrompt = null;
+let popupTimer, toastTimer;
+let currentTheme = load('pl_theme', 'default');
+let academicYear = load('pl_year', '2024/2025');
+
+// ============================================================
+// THEME
+// ============================================================
+function applyTheme(t) {
+  currentTheme = t;
+  document.body.setAttribute('data-theme', t === 'default' ? '' : t);
+  document.getElementById('meta-theme').content = getComputedStyle(document.body).getPropertyValue('--accent').trim() || '#7c6eff';
+  document.querySelectorAll('.theme-swatch').forEach(s => s.classList.toggle('active', s.dataset.theme === t));
+  save('pl_theme', t);
+}
+applyTheme(currentTheme);
+
+// ============================================================
+// ACADEMIC YEAR
+// ============================================================
+function applyYear(y) {
+  academicYear = y;
+  document.getElementById('app-subtitle').textContent = `DEPT. OF STATISTICS — ${y} FIRST SEM`;
+  document.querySelector('.footer').innerHTML = `<span>Private Lobby</span> · ND2 Statistics · ${y}`;
+  save('pl_year', y);
+}
+applyYear(academicYear);
+
+// ============================================================
+// GREETING
+// ============================================================
+function showGreeting() {
+  const h = new Date().getHours();
+  let emoji, text, sub;
+  if (h < 12)      { emoji='☀️'; text='Good Morning'; sub='Ready for classes today?'; }
+  else if (h < 17) { emoji='🌤️'; text='Good Afternoon'; sub='Hope the day is going well!'; }
+  else             { emoji='🌙'; text='Good Evening'; sub='Check tomorrow\'s schedule!'; }
+  document.getElementById('greeting-emoji').textContent = emoji;
+  document.getElementById('greeting-text').textContent  = text;
+  document.getElementById('greeting-sub').textContent   = sub;
+  const o = document.getElementById('greeting-overlay');
+  o.style.display = 'flex';
+  setTimeout(() => o.classList.add('fade-out'), 1800);
+  setTimeout(() => o.classList.add('gone'), 2400);
+}
+// Show greeting on first load each session
+if (!sessionStorage.getItem('pl_greeted')) {
+  sessionStorage.setItem('pl_greeted', '1');
+  showGreeting();
+} else {
+  document.getElementById('greeting-overlay').classList.add('gone');
+}
+
+// ============================================================
+// OFFLINE
+// ============================================================
+function updateOnline() {
+  const bar = document.getElementById('offline-bar');
+  if (!navigator.onLine) { bar.classList.add('show'); }
+  else { bar.classList.remove('show'); }
+}
+window.addEventListener('online',  updateOnline);
+window.addEventListener('offline', updateOnline);
+updateOnline();
+
+// ============================================================
+// SERVICE WORKER
+// ============================================================
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').then(r => { swReg = r; }).catch(()=>{});
+}
+
+// Install prompt — Android Chrome
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault(); deferredPrompt = e;
+  document.getElementById('install-banner').classList.add('show');
+});
+
+document.getElementById('install-btn').onclick = async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  if (outcome === 'accepted') showToast('✅ App installed!');
+  deferredPrompt = null;
+  document.getElementById('install-banner').classList.remove('show');
+};
+document.getElementById('install-close').onclick = () => document.getElementById('install-banner').classList.remove('show');
+window.addEventListener('appinstalled', () => showToast('🎉 Private Lobby installed!'));
+
+// iOS — show banner if in Safari not standalone
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+const isStandalone = window.matchMedia('(display-mode:standalone)').matches || window.navigator.standalone;
+if (isIOS && !isStandalone && !load('pl_ios_dismissed', false)) {
+  const b = document.getElementById('install-banner');
+  b.querySelector('.ib-text').innerHTML = '<strong>📱 Add to Home Screen</strong>Tap the Share button then "Add to Home Screen" in Safari!';
+  b.querySelector('.ib-btn').style.display = 'none';
+  b.classList.add('show');
+  document.getElementById('install-close').onclick = () => {
+    b.classList.remove('show'); save('pl_ios_dismissed', true);
+  };
+}
+
+// ============================================================
+// NOTIFICATIONS — persist state
+// ============================================================
+const notifSwitch = document.getElementById('notif-switch');
+notifSwitch.checked = notifEnabled;
+if (notifEnabled) document.getElementById('alert-sub').textContent = '✅ Alerts on — 5 min before class';
+
+notifSwitch.addEventListener('change', async function() {
+  if (this.checked) {
+    const perm = await Notification.requestPermission();
+    if (perm === 'granted') {
+      notifEnabled = true; save('pl_notif', true);
+      document.getElementById('alert-sub').textContent = '✅ Alerts on — 5 min before class';
+      showToast('🔔 Alerts enabled!');
+      if (swReg && 'periodicSync' in swReg) {
+        try { await swReg.periodicSync.register('class-check', { minInterval: 5*60*1000 }); } catch(e){}
+      }
+    } else {
+      this.checked = false; notifEnabled = false; save('pl_notif', false);
+      showToast('⚠️ Notifications blocked in browser');
+    }
+  } else {
+    notifEnabled = false; save('pl_notif', false);
+    document.getElementById('alert-sub').textContent = 'Notify me 5 min before class starts';
+  }
+});
+
+function fireNotif(title, body) {
+  document.getElementById('np-title').textContent = title;
+  document.getElementById('np-body').textContent  = body;
+  const p = document.getElementById('notif-popup');
+  p.classList.add('show');
+  clearTimeout(popupTimer);
+  popupTimer = setTimeout(() => p.classList.remove('show'), 6000);
+  if (swReg && Notification.permission === 'granted') {
+    swReg.active?.postMessage({ type:'SHOW_NOTIFICATION', title, body });
+  }
+}
+
+// ============================================================
+// SHARE
+// ============================================================
+document.getElementById('share-btn').onclick = async () => {
+  const url = window.location.href;
+  if (navigator.share) {
+    try { await navigator.share({ title:'Private Lobby — ND2 Timetable', text:'📅 Check our class schedule!', url }); }
+    catch(e) {}
+  } else {
+    await navigator.clipboard.writeText(url).catch(()=>{});
+    showToast('🔗 Link copied!');
+  }
+};
+
+// ============================================================
+// TOAST
+// ============================================================
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+const toMin  = t => { const [h,m]=t.split(':').map(Number); return h*60+m; };
+const fmt12  = t => { let [h,m]=t.split(':').map(Number); const s=h>=12?'PM':'AM'; h=h%12||12; return `${h}:${String(m).padStart(2,'0')}${s}`; };
+const dayName= d => ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d];
+
+function fmtCountdown(sec) {
+  if (sec<=0) return '00:00';
+  const h=Math.floor(sec/3600), m=Math.floor((sec%3600)/60), s=sec%60;
+  if (h>0) return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function getTodayName() { return dayName(new Date().getDay()); }
+function getActiveDay()  { return selectedDay || (DAYS.includes(getTodayName()) ? getTodayName() : 'Monday'); }
+
+// ============================================================
+// RENDER TABS
+// ============================================================
+function renderTabs() {
+  const c = document.getElementById('day-tabs');
+  c.innerHTML = '';
+  const today = getTodayName();
+  const addTab = (label, day) => {
+    const b = document.createElement('div');
+    b.className = 'day-tab' +
+      (day === null ? (selectedDay===null ? ' active':'') : (selectedDay===day?' active':'')) +
+      (day===today ? ' today' : '');
+    b.textContent = label;
+    b.onclick = () => { selectedDay=day; renderTabs(); renderSchedule(); };
+    c.appendChild(b);
+  };
+  addTab('Today', null);
+  DAYS.forEach(d => addTab(d.slice(0,3), d));
+}
+
+// ============================================================
+// RENDER SCHEDULE
+// ============================================================
+function renderSchedule() {
+  const day   = getActiveDay();
+  const slots = TIMETABLE[day] || [];
+  const list  = document.getElementById('schedule-list');
+  const today = getTodayName();
+  const isToday = getActiveDay()===today && DAYS.includes(today);
+
+  document.getElementById('sched-title').textContent = selectedDay ? `${day}'s Schedule` : "Today's Schedule";
+
+  if (!slots.length) {
+    list.innerHTML = `<div class="free-day-msg">🎉 No classes scheduled!</div>`;
+    return;
+  }
+
+  const now    = new Date();
+  const curMin = now.getHours()*60+now.getMinutes();
+
+  let nextIdx = -1;
+  slots.forEach((s,i) => { if (s.code!=='BREAK' && nextIdx===-1 && curMin<toMin(s.start)) nextIdx=i; });
+
+  list.innerHTML = '';
+  slots.forEach((s,i) => {
+    const sMin=toMin(s.start), eMin=toMin(s.end);
+    const isLive  = isToday && curMin>=sMin && curMin<eMin;
+    const isPast  = isToday && curMin>=eMin;
+    const isBreak = s.code==='BREAK';
+    const isNext  = isToday && i===nextIdx;
+
+    const div = document.createElement('div');
+    div.className='slot'+(isLive?' is-live':'')+(isBreak?' is-break':'')+(isPast&&!isLive?' is-past':'');
+
+    const badges = [];
+    if (isLive)  badges.push(`<span class="sbadge sb-live">● LIVE</span>`);
+    else if (isNext) badges.push(`<span class="sbadge sb-next">NEXT</span>`);
+    if (s.room)     badges.push(`<span class="sbadge sb-room">📍 ${s.room}</span>`);
+    if (s.lecturer) badges.push(`<span class="sbadge sb-lec">👤 ${s.lecturer}</span>`);
+
+    div.innerHTML = `
+      <div class="slot-time"><span class="start">${fmt12(s.start)}</span><span>${fmt12(s.end)}</span></div>
+      <div class="slot-divider"></div>
+      <div class="slot-info">
+        <div class="slot-course">${isBreak ? '☕ Break' : s.code+' — '+s.course}</div>
+        ${badges.length ? `<div class="slot-details">${badges.join('')}</div>` : ''}
+      </div>
+    `;
+
+    // Click to edit
+    if (!isBreak) {
+      div.onclick = () => openEditModal(day, i, s);
+    }
+    list.appendChild(div);
+  });
+}
+
+// ============================================================
+// EDIT MODAL
+// ============================================================
+function openEditModal(day, idx, slot) {
+  document.getElementById('edit-modal-title').textContent = idx === -1 ? 'Add Class' : 'Edit Class';
+  document.getElementById('edit-day').value   = day;
+  document.getElementById('edit-idx').value   = idx;
+  document.getElementById('edit-code').value  = slot ? slot.code    : '';
+  document.getElementById('edit-title').value = slot ? slot.course  : '';
+  document.getElementById('edit-start').value = slot ? slot.start   : '08:00';
+  document.getElementById('edit-end').value   = slot ? slot.end     : '10:00';
+  document.getElementById('edit-room').value  = slot ? slot.room    : '';
+  document.getElementById('edit-lec').value   = slot ? slot.lecturer: '';
+  document.getElementById('edit-delete').style.display = idx === -1 ? 'none' : 'block';
+  document.getElementById('edit-modal').classList.add('open');
+}
+
+document.getElementById('add-slot-btn').onclick = () => {
+  openEditModal(getActiveDay(), -1, null);
+};
+
+document.getElementById('edit-save').onclick = () => {
+  const day  = document.getElementById('edit-day').value;
+  const idx  = parseInt(document.getElementById('edit-idx').value);
+  const slot = {
+    code:     document.getElementById('edit-code').value.trim().toUpperCase() || 'NEW',
+    course:   document.getElementById('edit-title').value.trim() || 'New Class',
+    start:    document.getElementById('edit-start').value,
+    end:      document.getElementById('edit-end').value,
+    room:     document.getElementById('edit-room').value.trim(),
+    lecturer: document.getElementById('edit-lec').value.trim(),
+  };
+  if (!TIMETABLE[day]) TIMETABLE[day]=[];
+  if (idx === -1) TIMETABLE[day].push(slot);
+  else TIMETABLE[day][idx] = slot;
+  // Sort by start time
+  TIMETABLE[day].sort((a,b) => toMin(a.start)-toMin(b.start));
+  save('pl_timetable', TIMETABLE);
+  document.getElementById('edit-modal').classList.remove('open');
+  renderSchedule();
+  showToast('✅ Class updated!');
+};
+
+document.getElementById('edit-delete').onclick = () => {
+  const day = document.getElementById('edit-day').value;
+  const idx = parseInt(document.getElementById('edit-idx').value);
+  TIMETABLE[day].splice(idx, 1);
+  save('pl_timetable', TIMETABLE);
+  document.getElementById('edit-modal').classList.remove('open');
+  renderSchedule();
+  showToast('🗑️ Class removed');
+};
+
+document.getElementById('edit-cancel').onclick = () => document.getElementById('edit-modal').classList.remove('open');
+document.getElementById('edit-modal').onclick = e => { if (e.target===document.getElementById('edit-modal')) document.getElementById('edit-modal').classList.remove('open'); };
+
+// ============================================================
+// SETTINGS MODAL
+// ============================================================
+document.getElementById('settings-btn').onclick = () => {
+  document.getElementById('year-input').value = academicYear;
+  document.querySelectorAll('.theme-swatch').forEach(s => s.classList.toggle('active', s.dataset.theme===currentTheme));
+  document.getElementById('settings-modal').classList.add('open');
+};
+document.getElementById('settings-close').onclick = () => {
+  applyYear(document.getElementById('year-input').value.trim() || '2024/2025');
+  document.getElementById('settings-modal').classList.remove('open');
+};
+document.getElementById('settings-modal').onclick = e => {
+  if (e.target===document.getElementById('settings-modal')) {
+    applyYear(document.getElementById('year-input').value.trim() || '2024/2025');
+    document.getElementById('settings-modal').classList.remove('open');
+  }
+};
+document.querySelectorAll('.theme-swatch').forEach(s => {
+  s.onclick = () => { applyTheme(s.dataset.theme); showToast('🎨 Theme applied!'); };
+});
+document.getElementById('reset-btn').onclick = () => {
+  if (confirm('Reset timetable to original? All edits will be lost.')) {
+    TIMETABLE = JSON.parse(JSON.stringify(DEFAULT_TT));
+    save('pl_timetable', TIMETABLE);
+    renderSchedule(); updateNow();
+    document.getElementById('settings-modal').classList.remove('open');
+    showToast('↩️ Timetable reset!');
+  }
+};
+
+// ============================================================
+// UPDATE NOW CARD
+// ============================================================
+function updateNow() {
+  const today = getTodayName();
+  if (!DAYS.includes(today)) {
+    document.getElementById('now-course').textContent = '🎉 Weekend — No Classes';
+    document.getElementById('now-course').className = 'now-course free-text';
+    document.getElementById('now-meta').innerHTML = '';
+    document.getElementById('progress-wrap').style.display = 'none';
+    document.getElementById('next-name').textContent = 'Enjoy the break!';
+    document.getElementById('countdown-timer').textContent = '--';
+    document.getElementById('countdown-timer').className = 'countdown-timer';
+    return;
+  }
+
+  const now    = new Date();
+  const curMin = now.getHours()*60+now.getMinutes();
+  const curSec = now.getSeconds();
+  const slots  = TIMETABLE[today] || [];
+
+  let cur=null, next=null;
+  slots.forEach(s => {
+    const sMin=toMin(s.start), eMin=toMin(s.end);
+    if (curMin>=sMin && curMin<eMin) cur=s;
+    else if (!next && curMin<sMin && s.code!=='BREAK') next=s;
+  });
+
+  const nowEl  = document.getElementById('now-course');
+  const metaEl = document.getElementById('now-meta');
+  const progEl = document.getElementById('progress-wrap');
+
+  if (cur) {
+    const isBreak = cur.code==='BREAK';
+    nowEl.textContent = isBreak ? '☕ Break Time' : `${cur.code} — ${cur.course}`;
+    nowEl.className   = 'now-course '+(isBreak?'break-text':'live-text');
+    let tags='';
+    if (!isBreak) tags+=`<span class="tag live-tag">● LIVE</span>`;
+    if (cur.room)     tags+=`<span class="tag room">📍 ${cur.room}</span>`;
+    if (cur.lecturer) tags+=`<span class="tag lec">👤 ${cur.lecturer}</span>`;
+    tags+=`<span class="tag time">⏰ ${fmt12(cur.start)} – ${fmt12(cur.end)}</span>`;
+    metaEl.innerHTML = tags;
+
+    const sMin=toMin(cur.start), eMin=toMin(cur.end);
+    const totalSec=(eMin-sMin)*60, doneSec=(curMin-sMin)*60+curSec;
+    const pct=Math.min(100,Math.round(doneSec/totalSec*100));
+    progEl.style.display='block';
+    document.getElementById('prog-start').textContent = fmt12(cur.start);
+    document.getElementById('prog-end').textContent   = fmt12(cur.end);
+    document.getElementById('prog-pct').textContent   = pct+'%';
+    document.getElementById('prog-fill').style.width  = pct+'%';
+  } else {
+    const allDone = slots.every(s=>curMin>=toMin(s.end));
+    nowEl.textContent = allDone ? 'No more classes today 🌙' : curMin<toMin(slots[0]?.start||'23:59') ? 'Classes haven\'t started yet ☀️' : 'Free Period 📖';
+    nowEl.className   = 'now-course free-text';
+    metaEl.innerHTML  = '';
+    progEl.style.display = 'none';
+  }
+
+  // Countdown
+  const nextNameEl  = document.getElementById('next-name');
+  const timerEl     = document.getElementById('countdown-timer');
+  if (next) {
+    const sMin=toMin(next.start);
+    const totalSec=Math.max(0,(sMin-curMin)*60-curSec);
+    nextNameEl.textContent   = `${next.code} — ${next.course}`;
+    timerEl.textContent      = fmtCountdown(totalSec);
+    timerEl.className        = 'countdown-timer'+(totalSec<=300?' urgent':'');
+
+    if (notifEnabled && totalSec>0 && totalSec<=300) {
+      const key=today+'-'+next.code+'-'+next.start;
+      if (!alerted[key]) {
+        alerted[key]=true;
+        fireNotif(`⏰ Class in 5 min!`, `${next.code} — ${next.room||next.course}`);
+      }
+    }
+    if (totalSec<=0) delete alerted[today+'-'+next.code+'-'+next.start];
+  } else {
+    nextNameEl.textContent = 'No more classes today';
+    timerEl.textContent    = '--';
+    timerEl.className      = 'countdown-timer';
+  }
+}
+
+// ============================================================
+// CLOCK
+// ============================================================
+function updateClock() {
+  const now=new Date();
+  const h=String(now.getHours()).padStart(2,'0'),m=String(now.getMinutes()).padStart(2,'0'),s=String(now.getSeconds()).padStart(2,'0');
+  document.getElementById('clock').textContent=`${h}:${m}:${s}`;
+  const days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  document.getElementById('date-display').textContent=`${days[now.getDay()]}, ${months[now.getMonth()]} ${now.getDate()}`;
+}
+
+// ============================================================
+// INIT
+// ============================================================
+renderTabs();
+renderSchedule();
+updateNow();
+updateClock();
+
+setInterval(() => {
+  updateNow();
+  updateClock();
+  if (new Date().getSeconds()===0) renderSchedule();
+}, 1000);
+</script>
+</body>
+</html>
